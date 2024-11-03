@@ -4,10 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mobi.sevenwinds.app.author.AuthorEntity
 import mobi.sevenwinds.app.author.AuthorTable
-import org.jetbrains.exposed.sql.Query
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.select
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object BudgetService {
@@ -52,7 +49,7 @@ object BudgetService {
                 .orderBy(BudgetTable.month to SortOrder.ASC, BudgetTable.amount to SortOrder.DESC)
         } else {
             val authorQueryByFio = AuthorTable
-                .select { AuthorTable.fio eq param.fio }
+                .select { AuthorTable.fio.lowerCase() like "%${param.fio.toLowerCase()}%"}
 
             val authorIdList = AuthorEntity.wrapRows(authorQueryByFio).map { it.toId() }
 

@@ -79,19 +79,19 @@ class BudgetApiKtTest : ServerTest() {
         addRecord(BudgetCreateRecordRequest(2020, 5, 400, BudgetType.Приход, 3))
 
         RestAssured.given()
-            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Pushkin")
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=PuShK")
             .toResponse<BudgetYearStatsResponse>().let { response ->
                 Assert.assertEquals(3, response.total)
             }
 
         RestAssured.given()
-            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Esenin")
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=nIn")
             .toResponse<BudgetYearStatsResponse>().let { response ->
                 Assert.assertEquals(2, response.total)
             }
 
         RestAssured.given()
-            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Bonopart")
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=oNOp")
             .toResponse<BudgetYearStatsResponse>().let { response ->
                 Assert.assertEquals(1, response.total)
             }
