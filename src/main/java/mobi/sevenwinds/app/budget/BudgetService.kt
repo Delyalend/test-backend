@@ -2,21 +2,24 @@ package mobi.sevenwinds.app.budget
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import mobi.sevenwinds.app.author.AuthorEntity
+import mobi.sevenwinds.app.author.AuthorTable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.transactions.transaction
 
 object BudgetService {
-    suspend fun addRecord(body: BudgetRecord): BudgetRecord = withContext(Dispatchers.IO) {
+    suspend fun addRecord(body: BudgetCreateRecordRequest): BudgetCreateRecordResponse = withContext(Dispatchers.IO) {
         transaction {
             val entity = BudgetEntity.new {
                 this.year = body.year
                 this.month = body.month
                 this.amount = body.amount
                 this.type = body.type
+                this.authorId = body.authorId
             }
 
-            return@transaction entity.toResponse()
+            return@transaction entity.toBudgetCreateRecordResponse(body.authorId)
         }
     }
 
@@ -28,16 +31,29 @@ object BudgetService {
 
             val total = query.count()
 
-            val unlimitedData = BudgetEntity.wrapRows(query).map { it.toResponse() }
+            val unlimitedData = BudgetEntity.wrapRows(query).map { it.toBudgetRecordResponse() }
             val sumByType = unlimitedData.groupBy { it.type.name }.mapValues { it.value.sumOf { v -> v.amount } }
 
             query.limit(param.limit, param.offset)
-            val limitedData = BudgetEntity.wrapRows(query).map { it.toResponse() }
+            val limitedData = BudgetEntity.wrapRows(query).map {
+                val authorId = it.authorId
+                if (authorId == null) {
+                    it.toBudgetRecordResponse()
+                } else {
+                    val authorQuery = AuthorTable
+                        .select { AuthorTable.id eq authorId }
+                        .single()
+
+                    val author = AuthorEntity.wrapRow(authorQuery)
+                    it.toBudgetRecordResponse(author.toResponse())
+                }
+            }
+
 
             return@transaction BudgetYearStatsResponse(
                 total = total,
                 totalByType = sumByType,
-                items = limitedData
+                items = limitedData,
             )
         }
     }
