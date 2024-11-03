@@ -1,11 +1,14 @@
 package mobi.sevenwinds.app.budget
 
 import io.restassured.RestAssured
+import mobi.sevenwinds.app.author.AuthorRecordRequest
+import mobi.sevenwinds.app.author.AuthorRecordResponse
 import mobi.sevenwinds.common.ServerTest
 import mobi.sevenwinds.common.jsonBody
 import mobi.sevenwinds.common.toResponse
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
 import org.junit.Assert
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -63,6 +66,38 @@ class BudgetApiKtTest : ServerTest() {
     }
 
     @Test
+    fun testStatsWithFioFilter() {
+        addAuthorRecord(AuthorRecordRequest("Pushkin"))
+        addAuthorRecord(AuthorRecordRequest("Esenin"))
+        addAuthorRecord(AuthorRecordRequest("Bonopart"))
+
+        addRecord(BudgetCreateRecordRequest(2020, 5, 100, BudgetType.Приход, 1))
+        addRecord(BudgetCreateRecordRequest(2020, 1, 5, BudgetType.Приход, 1))
+        addRecord(BudgetCreateRecordRequest(2020, 1, 5, BudgetType.Приход, 1))
+        addRecord(BudgetCreateRecordRequest(2020, 5, 50, BudgetType.Приход, 2))
+        addRecord(BudgetCreateRecordRequest(2020, 1, 30, BudgetType.Приход, 2))
+        addRecord(BudgetCreateRecordRequest(2020, 5, 400, BudgetType.Приход, 3))
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Pushkin")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                Assert.assertEquals(3, response.total)
+            }
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Esenin")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                Assert.assertEquals(2, response.total)
+            }
+
+        RestAssured.given()
+            .get("/budget/year/2020/stats?limit=100&offset=0&fio=Bonopart")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                Assert.assertEquals(1, response.total)
+            }
+    }
+
+    @Test
     fun testInvalidMonthValues() {
         RestAssured.given()
             .jsonBody(BudgetCreateRecordRequest(2020, -5, 5, BudgetType.Приход))
@@ -81,6 +116,16 @@ class BudgetApiKtTest : ServerTest() {
             .post("/budget/add")
             .toResponse<BudgetCreateRecordRequest>().let { response ->
                 Assert.assertEquals(record, response)
+            }
+    }
+
+    private fun addAuthorRecord(authorRecordRequest: AuthorRecordRequest) {
+        RestAssured.given()
+            .jsonBody(authorRecordRequest)
+            .post("/author/add")
+            .toResponse<AuthorRecordResponse>().let { response ->
+                val newResponse = AuthorRecordResponse(authorRecordRequest.fio, DateTime.now().toString())
+                Assert.assertEquals(authorRecordRequest.fio, newResponse.fio)
             }
     }
 }

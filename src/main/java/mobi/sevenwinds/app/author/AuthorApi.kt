@@ -6,7 +6,6 @@ import com.papsign.ktor.openapigen.route.path.normal.NormalOpenAPIRoute
 import com.papsign.ktor.openapigen.route.path.normal.post
 import com.papsign.ktor.openapigen.route.response.respond
 import com.papsign.ktor.openapigen.route.route
-import org.joda.time.DateTime
 
 fun NormalOpenAPIRoute.author() {
     route("/author") {
@@ -22,5 +21,5 @@ data class AuthorRecordRequest(
 
 data class AuthorRecordResponse(
     @Length(3, 300) val fio: String,
-    val createdAt: DateTime
+    val createdAt: String
 )
