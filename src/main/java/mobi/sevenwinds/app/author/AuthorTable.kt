@@ -19,4 +19,9 @@ class AuthorEntity(id: EntityID<Int>) : IntEntity(id) {
     fun toResponse(): AuthorRecordResponse {
         return AuthorRecordResponse(fio, createdAt)
     }
+
+    fun toId(): Int {
+        return this.id.value;
+    }
+
 }
