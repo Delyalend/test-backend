@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mobi.sevenwinds.app.author.AuthorEntity
 import mobi.sevenwinds.app.author.AuthorTable
+import org.jetbrains.exposed.sql.Query
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.select
@@ -26,49 +27,57 @@ object BudgetService {
 
     suspend fun getYearStats(param: BudgetYearParam): BudgetYearStatsResponse = withContext(Dispatchers.IO) {
         transaction {
-            val query =
-                if (param.fio == null) {
-                    BudgetTable
-                        .select { BudgetTable.year eq param.year }
-                        .orderBy(BudgetTable.month to SortOrder.ASC, BudgetTable.amount to SortOrder.DESC)
-                } else {
-                    val authorQueryByFio = AuthorTable
-                        .select { AuthorTable.fio eq param.fio }
+            val budgetTableQuery = getBudgetTableQueryByBudgetYearParam(param)
 
-                    val authorIdList = AuthorEntity.wrapRows(authorQueryByFio).map { it.toId() }
+            val total = budgetTableQuery.count()
 
-                    BudgetTable
-                        .select {
-                            (BudgetTable.year eq param.year) and (BudgetTable.authorId inList authorIdList)
-                        }
-                        .orderBy(BudgetTable.month to SortOrder.ASC, BudgetTable.amount to SortOrder.DESC)
-                }
-
-            val total = query.count()
-
-            val unlimitedData = BudgetEntity.wrapRows(query).map { it.toBudgetRecordResponse() }
+            val unlimitedData = BudgetEntity.wrapRows(budgetTableQuery).map { it.toBudgetRecordResponse() }
             val sumByType = unlimitedData.groupBy { it.type.name }.mapValues { it.value.sumOf { v -> v.amount } }
 
-            query.limit(param.limit, param.offset)
-            val limitedData = BudgetEntity.wrapRows(query).map {
-                val authorId = it.authorId
-                if (authorId == null) {
-                    it.toBudgetRecordResponse()
-                } else {
-                    val authorQuery = AuthorTable
-                        .select { AuthorTable.id eq authorId }
-                        .single()
-
-                    val author = AuthorEntity.wrapRow(authorQuery)
-                    it.toBudgetRecordResponse(author.toResponse())
-                }
-            }
+            budgetTableQuery.limit(param.limit, param.offset)
+            val budgetRecordResponseList = getBudgetRecordResponseList(budgetTableQuery)
 
             return@transaction BudgetYearStatsResponse(
                 total = total,
                 totalByType = sumByType,
-                items = limitedData,
+                items = budgetRecordResponseList,
             )
         }
     }
+
+    private fun getBudgetTableQueryByBudgetYearParam(param: BudgetYearParam): Query {
+        return if (param.fio == null) {
+            BudgetTable
+                .select { BudgetTable.year eq param.year }
+                .orderBy(BudgetTable.month to SortOrder.ASC, BudgetTable.amount to SortOrder.DESC)
+        } else {
+            val authorQueryByFio = AuthorTable
+                .select { AuthorTable.fio eq param.fio }
+
+            val authorIdList = AuthorEntity.wrapRows(authorQueryByFio).map { it.toId() }
+
+            BudgetTable
+                .select {
+                    (BudgetTable.year eq param.year) and (BudgetTable.authorId inList authorIdList)
+                }
+                .orderBy(BudgetTable.month to SortOrder.ASC, BudgetTable.amount to SortOrder.DESC)
+        }
+    }
+
+    private fun getBudgetRecordResponseList(budgetTableQuery: Query): List<BudgetRecordResponse> {
+        return BudgetEntity.wrapRows(budgetTableQuery).map {
+            val authorId = it.authorId
+            if (authorId == null) {
+                it.toBudgetRecordResponse()
+            } else {
+                val authorQuery = AuthorTable
+                    .select { AuthorTable.id eq authorId }
+                    .single()
+
+                val author = AuthorEntity.wrapRow(authorQuery)
+                it.toBudgetRecordResponse(author.toResponse())
+            }
+        }
+    }
+
 }
